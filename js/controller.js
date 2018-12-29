@@ -1,14 +1,18 @@
-import { treePoints } from "./tree-points";
-import { presentPoints } from "./present-points";
+import { australiaPoints } from "./australia-points";
+import { usaPoints } from "./usa-points";
 import { getFourierData, resample2dData } from "./fourier";
 import { gray, divideInterval } from "./util";
 
 const FFTPoints = 1024;
 
+const presentPoints = australiaPoints;
+const treePoints = usaPoints;
+
 export default class Controller {
 
 	constructor() {
 		this.animAmt = 0;
+		this.niceAnimAmt = 0;
 		this.period = 20;
 		this.cyclesPerPeriod = 2;
 
@@ -35,17 +39,24 @@ export default class Controller {
 	}
 
 	update(dt) {
-		let framesDone = 0;
-		dt %= 1;
+        this.animAmt += (dt / this.period) % 1;
 
-		while (framesDone < dt / this.period) {
-			this.animAmt += (1 / this.cyclesPerPeriod) / FFTPoints;
-			if (this.animAmt >= 1) {
+        while (this.animAmt > 1) {
+            this.animAmt --;
+            this.niceAnimAmt --;
+		}
+		
+        // some max iterations to stop it from hanging
+        for (let i = 0; i < 20; i ++) {
+            if (this.niceAnimAmt >= this.animAmt) {
+                break;
+            }
+            this.niceAnimAmt += 1 / FFTPoints;
+
+			if (this.niceAnimAmt >= 1) {
 				this.treeDrawnPoints = [];
 				this.presentDrawnPoints = [];
 			}
-			this.animAmt %= 1;
-			framesDone += (1 / this.cyclesPerPeriod) / FFTPoints;
 	
 			this.renderCircles(null, this.topLeftFFT, this.cyclesPerPeriod * this.animAmt, 'topleft');
 			this.renderCircles(null, this.bottomRightFFT, this.cyclesPerPeriod * this.animAmt, 'bottomright');
@@ -124,8 +135,10 @@ export default class Controller {
 		context.stroke();
 	}
 
+	/**
+	 * @param {CanvasRenderingContext2D} context 
+	 */
 	renderPath(context, path, closePath=true) {
-		
 		let start = 1;
 		if (closePath) {
 			start = 0;
@@ -139,6 +152,7 @@ export default class Controller {
 
 			context.beginPath();
 			context.strokeStyle = gray(whiteAmt);
+			context.lineCap = 'round';
 			context.lineWidth = 2;
 			context.moveTo(prevPoint.x, prevPoint.y);
 			context.lineTo(curPoint.x, curPoint.y);
