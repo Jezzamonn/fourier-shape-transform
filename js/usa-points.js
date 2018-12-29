@@ -1031,8 +1031,4 @@ export const usaPoints = basePoints
     .map(p => ({
         x: p.x - sumX / basePoints.length,
         y: p.y - sumY / basePoints.length
-    }))
-    .map(p => ({
-        x: p.x / 3,
-        y: p.y / 3,
     }));

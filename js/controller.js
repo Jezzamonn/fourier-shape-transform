@@ -1,82 +1,44 @@
 import { australiaPoints } from "./australia-points";
 import { usaPoints } from "./usa-points";
 import { getFourierData, resample2dData } from "./fourier";
-import { gray, divideInterval } from "./util";
+import { gray, divideInterval, slurp, easeInOut, loop } from "./util";
 
 const FFTPoints = 1024;
 
-const presentPoints = australiaPoints;
-const treePoints = usaPoints;
+// I'm lazy
+const ausPoints = australiaPoints;
 
 export default class Controller {
 
 	constructor() {
 		this.animAmt = 0;
-		this.niceAnimAmt = 0;
-		this.period = 20;
-		this.cyclesPerPeriod = 2;
+		this.period = 4;
 
-		this.xTreeYPresent = [];
-		this.yTreeXPresent = [];
-		for (let i = 0; i < presentPoints.length; i ++) {
-			this.xTreeYPresent.push({
-				x: treePoints[i].x,
-				y: presentPoints[i].y,
-			})
-			this.yTreeXPresent.push({
-				x: presentPoints[i].x,
-				y: treePoints[i].y,
-			})
-		}
-		this.topLeftFFT = getFourierData(resample2dData(this.yTreeXPresent, FFTPoints));
-		this.bottomRightFFT = getFourierData(resample2dData(this.xTreeYPresent, FFTPoints));
+		this.ausFFT = getFourierData(resample2dData(ausPoints, FFTPoints));
+		this.usaFFT = getFourierData(resample2dData(usaPoints, FFTPoints));
 
-		this.treeDrawnPoints = [];
-		this.presentDrawnPoints = [];
+		this.drawnPoints = [];
 
 		this.lastFourierX = 0;
 		this.lastFourierY = 0;
 	}
 
 	update(dt) {
-        this.animAmt += (dt / this.period) % 1;
+		this.animAmt += dt / this.period;
+		this.animAmt %= 1;
+	}
 
-        while (this.animAmt > 1) {
-            this.animAmt --;
-            this.niceAnimAmt --;
+	getFullPath(fft) {
+		const path = [];
+
+		for (let i = 0; i < FFTPoints; i ++) {
+			const amt = i / FFTPoints;
+
+			const point = this.renderCircles(null, fft, amt);
+			path.push(point);
 		}
 		
-        // some max iterations to stop it from hanging
-        for (let i = 0; i < 20; i ++) {
-            if (this.niceAnimAmt >= this.animAmt) {
-                break;
-            }
-            this.niceAnimAmt += 1 / FFTPoints;
-
-			if (this.niceAnimAmt >= 1) {
-				this.treeDrawnPoints = [];
-				this.presentDrawnPoints = [];
-			}
-	
-			this.renderCircles(null, this.topLeftFFT, this.cyclesPerPeriod * this.animAmt, 'topleft');
-			this.renderCircles(null, this.bottomRightFFT, this.cyclesPerPeriod * this.animAmt, 'bottomright');
-	
-			this.treeDrawnPoints.push({
-				x: this.bottomRightX,
-				y: this.topLeftY,
-			});
-			this.presentDrawnPoints.push({
-				x: this.topLeftX,
-				y: this.bottomRightY,
-			});
-	
-			while (this.treeDrawnPoints.length > FFTPoints) {
-				this.treeDrawnPoints.shift();
-			}
-			while (this.presentDrawnPoints.length > FFTPoints) {
-				this.presentDrawnPoints.shift();
-			}
-		}
+		return path;
 	}
 
 	/**
@@ -84,47 +46,30 @@ export default class Controller {
 	 * @param {CanvasRenderingContext2D} context 
 	 */
 	render(context) {
-		const sep = 200;
+		const transAmt = easeInOut(loop(this.animAmt), 2);
+		const fft = this.fftLerp(this.ausFFT, this.usaFFT, transAmt);
+		const path = this.getFullPath(fft);
+		this.renderPath(context, path, true);
+	}
 
-		context.translate(-sep / 2, -sep / 2);
-		this.renderCircles(context, this.topLeftFFT, this.cyclesPerPeriod * this.animAmt, 'topleft');
+	fftLerp(fft1, fft2, amt) {
+		let newFFT = [];
+		for (let i = 0; i < FFTPoints; i ++) {
+			let newVal = {
+				freq: fft1[i].freq,
+				amplitude: slurp(fft1[i].amplitude, fft2[i].amplitude, amt),
+				phase: this.angularLerp(fft1[i].phase, fft2[i].phase, amt),
+			};
+			newFFT.push(newVal);
+		}
+		return newFFT;
+	}
 
-		context.translate(sep, sep);
-
-		this.renderCircles(context, this.bottomRightFFT, this.cyclesPerPeriod * this.animAmt, 'bottomright');
-
-		context.translate(-sep / 2, -sep / 2);
-
-		const alphaAmt = 1 - divideInterval(this.animAmt, 0.97, 1);
-		context.globalAlpha = alphaAmt;
-		context.translate(sep / 2, -sep / 2);
-		this.renderPath(context, this.treeDrawnPoints, false);
-		context.translate(-sep, sep);
-		this.renderPath(context, this.presentDrawnPoints, false);
-		context.translate(sep / 2, -sep / 2);
-		context.globalAlpha = 1;
-
-		context.lineWidth = 1;
-		this.renderLine(
-			context,
-			this.topLeftX - sep / 2, this.topLeftY - sep / 2,
-			this.bottomRightX + sep / 2, this.topLeftY - sep / 2,
-		);
-		this.renderLine(
-			context,
-			this.topLeftX - sep / 2, this.topLeftY - sep / 2,
-			this.topLeftX - sep / 2, this.bottomRightY + sep / 2,
-		);
-		this.renderLine(
-			context,
-			this.bottomRightX + sep / 2, this.bottomRightY + sep / 2,
-			this.bottomRightX + sep / 2, this.topLeftY - sep / 2,
-		);
-		this.renderLine(
-			context,
-			this.bottomRightX + sep / 2, this.bottomRightY + sep / 2,
-			this.topLeftX - sep / 2, this.bottomRightY + sep / 2,
-		);
+	angularLerp(angle1, angle2, amt) {
+		// really slow :(
+		const xTotal = (1 - amt) * Math.cos(angle1) + amt * Math.cos(angle2);
+		const yTotal = (1 - amt) * Math.sin(angle1) + amt * Math.sin(angle2);
+		return Math.atan2(yTotal, xTotal);
 	}
 
 	renderLine(context, startX, startY, endX, endY) {
@@ -139,28 +84,24 @@ export default class Controller {
 	 * @param {CanvasRenderingContext2D} context 
 	 */
 	renderPath(context, path, closePath=true) {
-		let start = 1;
-		if (closePath) {
-			start = 0;
-		}
-		for (let i = start; i < path.length; i ++) {
+		context.beginPath();
+		for (let i = 0; i < path.length; i ++) {
 			const amt = i / FFTPoints;
-			let whiteAmt = 1 - amt;
-			whiteAmt = Math.pow(whiteAmt, 4);
-			const curPoint = path[i];
-			const prevPoint = path[(i - 1 + path.length) % path.length];
 
-			context.beginPath();
-			context.strokeStyle = gray(whiteAmt);
-			context.lineCap = 'round';
-			context.lineWidth = 2;
-			context.moveTo(prevPoint.x, prevPoint.y);
-			context.lineTo(curPoint.x, curPoint.y);
-			context.stroke();
+			if (i == 0) {
+				context.moveTo(path[i].x, path[i].y);
+			}
+			else {
+				context.lineTo(path[i].x, path[i].y);
+			}
 		}
+		if (closePath) {
+			context.closePath();
+		}
+		context.stroke();
 	}
 
-	renderCircles(context, fourierData, amt, type='topleft') {
+	renderCircles(context, fourierData, amt) {
         let runningX = 0;
         let runningY = 0;
         for (let i = 0; i < fourierData.length; i ++) {
@@ -187,15 +128,8 @@ export default class Controller {
 		if (context) {
 			context.globalAlpha = 1;
 		}
-		
-		if (type == 'topleft') {
-			this.topLeftX = runningX;
-			this.topLeftY = runningY;
-		}
-		else {
-			this.bottomRightX = runningX;
-			this.bottomRightY = runningY;
-		}
+
+		return {x: runningX, y: runningY};
     }
 
 
