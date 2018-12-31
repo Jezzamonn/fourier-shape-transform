@@ -1029,6 +1029,6 @@ const sumX = basePoints.map(p => p.x).reduce((a, b) => a + b, 0);
 const sumY = basePoints.map(p => p.y).reduce((a, b) => a + b, 0);
 export const australiaPoints = basePoints
     .map(p => ({
-        x: p.x - sumX / basePoints.length,
-        y: p.y - sumY / basePoints.length,
+        x: p.x - 250,
+        y: p.y - 250,
     }));
