@@ -1,6 +1,6 @@
 import { australiaPoints } from "./australia-points";
 import { usaPoints } from "./usa-points";
-import { getFourierData, resample2dData } from "./fourier";
+import { getFourierData, resample2dData, getPoints } from "./fourier";
 import { gray, divideInterval, slurp, easeInOut, loop } from "./util";
 
 const FFTPoints = 1024;
@@ -27,20 +27,6 @@ export default class Controller {
 		this.animAmt += dt / this.period;
 		this.animAmt %= 1;
 	}
-
-	getFullPath(fft) {
-		const path = [];
-
-		for (let i = 0; i < FFTPoints; i ++) {
-			const amt = i / FFTPoints;
-
-			const point = this.renderCircles(null, fft, amt);
-			path.push(point);
-		}
-		
-		return path;
-	}
-
 	/**
 	 * 
 	 * @param {CanvasRenderingContext2D} context 
@@ -48,8 +34,12 @@ export default class Controller {
 	render(context) {
 		const transAmt = easeInOut(loop(this.animAmt), 2);
 		const fft = this.fftLerp(this.ausFFT, this.usaFFT, transAmt);
-		const path = this.getFullPath(fft);
+		const path = getPoints(fft);
 		this.renderPath(context, path, true);
+
+		context.translate(-170, 220);
+		context.scale(0.3, 0.3);
+		this.renderCircles(context, fft, 0);
 	}
 
 	fftLerp(fft1, fft2, amt) {

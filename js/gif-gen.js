@@ -13,7 +13,7 @@ function renderFrame(context, controller, width, height) {
 
     // Set origin to middle.
     context.translate(width / 2, height / 2);
-    context.scale(1080 / 500, 1080 / 500);
+    // context.scale(1080 / 500, 1080 / 500);
     
     controller.render(context);
 }
@@ -74,8 +74,8 @@ function generateFrames(controller, options, outDirectory) {
 function main() {
     const controller = new Controller();
     const options = {
-        width: 1080,
-        height: 1080,
+        width: 500,
+        height: 500,
         fps: 30,
         numSubFrames: 1,
         length: controller.period,

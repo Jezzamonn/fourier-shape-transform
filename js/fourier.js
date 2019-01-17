@@ -94,3 +94,39 @@ export function resample2dData(points, numSamples) {
     }
     return newPoints;
 }
+
+/**
+ * @param {Array<{freq:number, amplitude:number, phase:number}} fftData 
+ */
+export function getPoints(fftData) {
+    if (fftData.length == 0) {
+        return [];
+    }
+
+    const numPoints = fftData.length;
+    const fft = new FFT(numPoints);
+
+    const formatedData = fft.createComplexArray();
+    for (let i = 0; i < numPoints; i ++) {
+        const datum = fftData[i];
+        let index = datum.freq;
+        if (index < 0) {
+            index += numPoints;
+        }
+        formatedData[2 * index] = numPoints * datum.amplitude * Math.cos(datum.phase);
+        formatedData[2 * index + 1] = numPoints * datum.amplitude * Math.sin(datum.phase);
+    }
+
+    const out = fft.createComplexArray();
+    fft.inverseTransform(out, formatedData);
+
+    const points = [];
+    for (let i = 0; i < numPoints; i ++) {
+        const point = {
+            x: out[2 * i],
+            y: out[2 * i + 1]
+        }
+        points.push(point);
+    }
+    return points;
+}
