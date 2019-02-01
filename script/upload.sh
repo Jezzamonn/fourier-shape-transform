@@ -11,6 +11,7 @@ path=$1
 # TODO: Update HTML, etc so the path gets updated
 
 gsutil -m cp *.html gs://www.jezzamon.com/$path/
+gsutil -m cp preview.png gs://www.jezzamon.com/$path/
 gsutil -m cp -r build/ gs://www.jezzamon.com/$path/
 gsutil -m cp -r css/ gs://www.jezzamon.com/$path/
 gsutil -m acl ch -r -u AllUsers:R gs://www.jezzamon.com/$path
